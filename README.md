@@ -3,6 +3,11 @@
 Оператор загружает фото дивана → вводит 3–5 размеров → система генерирует готовые
 **DXF-файлы каркаса** для ЧПУ-станка, карту раскроя и историю заказов.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Spandiyar7/sofa-cnc)
+
+> Нажмите кнопку выше → войдите через GitHub → впишите `ANTHROPIC_API_KEY` → получите
+> рабочую ссылку `https://…onrender.com`. Подробности ниже в разделе «Деплой в облако».
+
 ```
 [Фото] → [Claude Vision] → [тип + конфигурация]
                                   ↓
