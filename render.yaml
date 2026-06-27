@@ -1,0 +1,15 @@
+# Render Blueprint: деплой в один клик.
+# 1. Залейте репозиторий на GitHub.
+# 2. На render.com -> New -> Blueprint -> выберите этот репозиторий.
+# 3. Впишите ANTHROPIC_API_KEY в настройках сервиса -> получите https-ссылку.
+services:
+  - type: web
+    name: sofa-cnc
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false            # секрет вводится в дашборде Render, не в коде
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-4-6

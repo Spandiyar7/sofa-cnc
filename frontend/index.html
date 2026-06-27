@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Чертежи каркасов дивана для ЧПУ</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>🛋️ Каркасы дивана → DXF для ЧПУ</h1>
+  <nav>
+    <a href="/">Новый заказ</a>
+    <a href="/orders">История заказов</a>
+  </nav>
+</header>
+
+<div class="wrap">
+
+  <!-- Блок А — Загрузка фото -->
+  <div class="card">
+    <h2>А. Фото дивана</h2>
+    <div id="dropzone" class="dropzone">
+      <p>Перетащите фото сюда или нажмите, чтобы выбрать</p>
+      <input id="fileInput" type="file" accept="image/*" class="hidden">
+    </div>
+    <div class="btn-row" style="margin-top:12px">
+      <button id="analyzeBtn" class="btn" disabled>Анализировать</button>
+      <span id="analyzeStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- Блок Б — Результат анализа AI -->
+  <div id="aiCard" class="card hidden">
+    <h2>Б. Результат анализа <span id="srcBadge" class="badge">AI</span></h2>
+    <div class="grid">
+      <div class="field">
+        <label>Тип дивана</label>
+        <select id="f_type">
+          <option value="straight">Прямой</option>
+          <option value="corner_l">Угловой Г-образный</option>
+          <option value="corner_u">П-образный</option>
+          <option value="armchair">Кресло</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Подлокотники</label>
+        <select id="f_armrests">
+          <option value="both">С двух сторон</option>
+          <option value="left">Слева</option>
+          <option value="right">Справа</option>
+          <option value="none">Без подлокотников</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Спинка</label>
+        <select id="f_backrest">
+          <option value="straight">Прямая</option>
+          <option value="angled">С наклоном</option>
+          <option value="reclining">Раскладная</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Шезлонг</label>
+        <select id="f_chaise">
+          <option value="false">Нет</option>
+          <option value="true">Да</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Количество секций</label>
+        <input id="f_sections" type="number" min="1" max="6" value="1">
+      </div>
+      <div class="field">
+        <label>Ножки видны</label>
+        <select id="f_legs">
+          <option value="true">Да</option>
+          <option value="false">Нет</option>
+        </select>
+      </div>
+    </div>
+    <p id="aiNote" class="muted"></p>
+  </div>
+
+  <!-- Блок В — Параметры -->
+  <div class="card">
+    <h2>В. Параметры каркаса</h2>
+    <div class="grid">
+      <div class="field">
+        <label>Общая длина, мм</label>
+        <input id="f_length" type="number" value="2000">
+      </div>
+      <div class="field" id="length2Wrap">
+        <label>Длина блока Б, мм</label>
+        <input id="f_length2" type="number" value="1600">
+      </div>
+      <div class="field" id="length3Wrap">
+        <label>Длина правого блока, мм</label>
+        <input id="f_length3" type="number" value="1600">
+      </div>
+      <div class="field">
+        <label>Глубина, мм</label>
+        <input id="f_depth" type="number" value="900">
+      </div>
+      <div class="field">
+        <label>Высота спинки от пола, мм</label>
+        <input id="f_height_back" type="number" value="850">
+      </div>
+      <div class="field">
+        <label>Высота сиденья от пола, мм</label>
+        <input id="f_height_seat" type="number" value="450">
+      </div>
+      <div class="field">
+        <label>Материал каркаса</label>
+        <select id="f_material">
+          <option>Фанера берёзовая</option>
+          <option>Фанера хвойная</option>
+          <option>Брус сосновый</option>
+          <option>ДСП 16мм</option>
+          <option>ДСП 22мм</option>
+          <option>MDF 16мм</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Толщина листа, мм</label>
+        <input id="f_thickness" type="number" value="18" step="0.5">
+      </div>
+      <div class="field">
+        <label>Тип соединения</label>
+        <select id="f_joint">
+          <option>Шкант</option>
+          <option>Конфирмат</option>
+          <option>Шип-паз</option>
+          <option>Саморез</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Блок Г — Генерация -->
+  <div class="card">
+    <div class="btn-row">
+      <button id="generateBtn" class="btn ok">Сгенерировать чертежи</button>
+      <span id="genStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- Экран 2 — Результат -->
+  <div id="resultCard" class="card hidden">
+    <h2>Результат</h2>
+    <div class="stats">
+      <div class="stat"><div class="num" id="r_unique">0</div><div class="lbl">уникальных деталей</div></div>
+      <div class="stat"><div class="num" id="r_total">0</div><div class="lbl">деталей всего</div></div>
+      <div class="stat"><div class="num" id="r_sheets">0</div><div class="lbl">листов материала</div></div>
+      <div class="stat"><div class="num" id="r_util">0%</div><div class="lbl">использование листа</div></div>
+    </div>
+    <div id="oversizeWarn" class="muted"></div>
+
+    <div class="btn-row" style="margin:6px 0 18px">
+      <button id="downloadBtn" class="btn">Скачать DXF (ZIP)</button>
+      <button id="saveBtn" class="btn secondary">Сохранить заказ</button>
+    </div>
+
+    <h3 style="font-size:14px">Детали каркаса</h3>
+    <div style="overflow-x:auto">
+      <table id="partsTable">
+        <thead><tr><th>Блок</th><th>Деталь</th><th>Кол-во</th><th>Д × Ш × Т, мм</th><th>Материал</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size:14px; margin-top:20px">Превью деталей</h3>
+    <div id="previews" class="previews"></div>
+
+    <h3 style="font-size:14px; margin-top:20px">Карта раскроя</h3>
+    <div id="cutmap" class="cutmap"></div>
+  </div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

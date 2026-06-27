@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>История заказов</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>🛋️ История заказов</h1>
+  <nav>
+    <a href="/">Новый заказ</a>
+    <a href="/orders">История заказов</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Все заказы</h2>
+    <div style="overflow-x:auto">
+      <table id="ordersTable">
+        <thead>
+          <tr>
+            <th>#</th><th>Дата</th><th>Тип</th><th>Размеры (Д×Г×В)</th>
+            <th>Материал</th><th>Листов</th><th>Статус</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p id="empty" class="muted hidden">Заказов пока нет.</p>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script>
+const TYPE_LABEL = {
+  straight: "Прямой", corner_l: "Угловой Г", corner_u: "П-образный", armchair: "Кресло",
+};
+const $ = (id) => document.getElementById(id);
+
+function toast(msg, isErr = false) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (isErr ? " err" : "");
+  setTimeout(() => (t.className = "toast"), 3000);
+}
+
+async function load() {
+  const res = await fetch("/api/orders");
+  const orders = await res.json();
+  const tbody = $("ordersTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  if (!orders.length) {
+    $("empty").classList.remove("hidden");
+    return;
+  }
+  orders.forEach((o) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${o.id}</td>` +
+      `<td>${o.created_at.replace("T", " ")}</td>` +
+      `<td>${TYPE_LABEL[o.sofa_type] || o.sofa_type}</td>` +
+      `<td>${o.length} × ${o.width} × ${o.height}</td>` +
+      `<td>${o.material}</td>` +
+      `<td>${o.sheets}</td>` +
+      `<td>${o.status}</td>` +
+      `<td>
+        <button class="btn secondary" style="padding:6px 12px" onclick="downloadOrder(${o.id})">Скачать DXF</button>
+        <button class="btn secondary" style="padding:6px 12px" onclick="duplicateOrder(${o.id})">Дублировать</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function downloadOrder(id) {
+  window.location = "/api/orders/" + id + "/download";
+}
+function duplicateOrder(id) {
+  window.location = "/?duplicate=" + id;
+}
+
+load().catch((e) => toast("Ошибка загрузки: " + e.message, true));
+</script>
+</body>
+</html>
