@@ -137,10 +137,49 @@
     </div>
   </div>
 
-  <!-- Блок Г — Генерация -->
+  <!-- Блок В2 — Параметры ЧПУ (CAM / G-code) -->
+  <div class="card">
+    <h2>Г. Параметры ЧПУ (G-code)</h2>
+    <label class="check">
+      <input id="f_gcode" type="checkbox" checked>
+      Генерировать траектории и G-code (NCStudio / RichAuto / DSP)
+    </label>
+    <div id="camFields" class="grid" style="margin-top:12px">
+      <div class="field">
+        <label>Диаметр фрезы, мм</label>
+        <input id="f_tool" type="number" value="6" step="0.5">
+      </div>
+      <div class="field">
+        <label>Обороты шпинделя, об/мин</label>
+        <input id="f_rpm" type="number" value="18000" step="500">
+      </div>
+      <div class="field">
+        <label>Подача резания, мм/мин</label>
+        <input id="f_feed_xy" type="number" value="3000" step="100">
+      </div>
+      <div class="field">
+        <label>Подача врезания, мм/мин</label>
+        <input id="f_feed_z" type="number" value="1000" step="100">
+      </div>
+      <div class="field">
+        <label>Глубина за проход, мм</label>
+        <input id="f_pass" type="number" value="6" step="0.5">
+      </div>
+      <div class="field">
+        <label>Перемычки: высота, мм</label>
+        <input id="f_tab_h" type="number" value="4" step="0.5">
+      </div>
+      <div class="field">
+        <label>Перемычки: ширина, мм</label>
+        <input id="f_tab_w" type="number" value="10" step="1">
+      </div>
+    </div>
+  </div>
+
+  <!-- Блок Д — Генерация -->
   <div class="card">
     <div class="btn-row">
-      <button id="generateBtn" class="btn ok">Сгенерировать чертежи</button>
+      <button id="generateBtn" class="btn ok">Сгенерировать чертежи + G-code</button>
       <span id="genStatus" class="muted"></span>
     </div>
   </div>
@@ -153,18 +192,22 @@
       <div class="stat"><div class="num" id="r_total">0</div><div class="lbl">деталей всего</div></div>
       <div class="stat"><div class="num" id="r_sheets">0</div><div class="lbl">листов материала</div></div>
       <div class="stat"><div class="num" id="r_util">0%</div><div class="lbl">использование листа</div></div>
+      <div class="stat cam"><div class="num" id="r_holes">0</div><div class="lbl">отверстий</div></div>
+      <div class="stat cam"><div class="num" id="r_cut">0</div><div class="lbl">метров реза</div></div>
+      <div class="stat cam"><div class="num" id="r_time">0</div><div class="lbl">~ минут на станке</div></div>
     </div>
     <div id="oversizeWarn" class="muted"></div>
+    <div id="solidNote" class="muted"></div>
 
     <div class="btn-row" style="margin:6px 0 18px">
-      <button id="downloadBtn" class="btn">Скачать DXF (ZIP)</button>
+      <button id="downloadBtn" class="btn">Скачать DXF + G-code (ZIP)</button>
       <button id="saveBtn" class="btn secondary">Сохранить заказ</button>
     </div>
 
     <h3 style="font-size:14px">Детали каркаса</h3>
     <div style="overflow-x:auto">
       <table id="partsTable">
-        <thead><tr><th>Блок</th><th>Деталь</th><th>Кол-во</th><th>Д × Ш × Т, мм</th><th>Материал</th></tr></thead>
+        <thead><tr><th>Блок</th><th>Деталь</th><th>Кол-во</th><th>Д × Ш × Т, мм</th><th>Материал</th><th>Заготовка</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -174,6 +217,12 @@
 
     <h3 style="font-size:14px; margin-top:20px">Карта раскроя</h3>
     <div id="cutmap" class="cutmap"></div>
+
+    <div id="gcodeSection">
+      <h3 style="font-size:14px; margin-top:20px">Симуляция траекторий ЧПУ (G-code)</h3>
+      <p class="warn-box">⚠️ Перед отправкой на станок проверьте симуляцию: <span style="color:#38bdf8">синие</span> линии — рез, <span style="color:#94a3b8">пунктир</span> — холостые ходы, <span style="color:#f87171">красные</span> — сверловка. Программы <code>.nc</code> по листам лежат в папке <code>gcode/</code> архива. <b>Сначала прогон без материала / на воздухе.</b></p>
+      <div id="backplots" class="previews"></div>
+    </div>
   </div>
 
 </div>

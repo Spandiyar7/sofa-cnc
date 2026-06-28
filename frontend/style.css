@@ -118,6 +118,19 @@ tr:hover td { background: #f8faff; }
 .toast.show { opacity: 1; }
 .toast.err { background: #b8312b; }
 
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); margin: 0; }
+.check input { width: auto; }
+.stat.cam { background: #0f1726; }
+.stat.cam .num { color: #38bdf8; }
+.stat.cam .lbl { color: #94a3b8; }
+.warn-box {
+  background: #fff8e6; border: 1px solid #f0d68a; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; color: #7a5b08; margin: 8px 0 14px;
+}
+.warn-box code { background: #00000010; padding: 1px 5px; border-radius: 4px; }
+#backplots .preview-item { background: #0f1726; border-color: #33415c; }
+#backplots .cap { color: #94a3b8; }
+
 .spinner {
   display: inline-block; width: 15px; height: 15px; border: 2px solid #fff;
   border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite;

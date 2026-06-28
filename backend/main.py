@@ -41,9 +41,10 @@ logger = logging.getLogger("sofa-cnc")
 from models import Order, engine, init_db  # noqa: E402
 from vision import analyze_photo  # noqa: E402
 from generators.frame_calculator import calculate, merge_parts  # noqa: E402
-from generators.dxf_generator import build_dxf_zip  # noqa: E402
+from generators.dxf_generator import build_dxf_zip, compute_holes  # noqa: E402
 from generators.svg_preview import part_preview_svg  # noqa: E402
 from generators import bin_packing  # noqa: E402
+from generators import cam  # noqa: E402
 
 app = FastAPI(title="Платформа чертежей каркасов дивана для ЧПУ")
 
@@ -80,6 +81,16 @@ class GenerateRequest(BaseModel):
     thickness: float = 18.0
     joint: str = "Шкант"
 
+    # --- параметры ЧПУ (CAM / G-code) ---
+    gcode: bool = True
+    tool_diameter: float = 6.0
+    spindle_rpm: int = 18000
+    feed_xy: float = 3000.0
+    feed_z: float = 1000.0
+    pass_depth: float = 6.0
+    tab_height: float = 4.0
+    tab_width: float = 10.0
+
 
 @app.on_event("startup")
 def _startup() -> None:
@@ -115,6 +126,13 @@ def _validate(req: GenerateRequest) -> None:
         raise HTTPException(422, "Высота спинки должна быть больше высоты сиденья")
     if not (5 <= req.thickness <= 60):
         raise HTTPException(422, "Толщина материала должна быть 5–60 мм")
+    if req.gcode:
+        if not (1 <= req.tool_diameter <= 25):
+            raise HTTPException(422, "Диаметр фрезы должен быть 1–25 мм")
+        if not (0.5 <= req.pass_depth <= req.thickness + 1):
+            raise HTTPException(422, "Глубина за проход должна быть 0.5 мм … толщина материала")
+        if req.feed_xy <= 0 or req.feed_z <= 0:
+            raise HTTPException(422, "Подачи должны быть больше нуля")
 
 
 def _run_pipeline(req: GenerateRequest) -> dict:
@@ -141,31 +159,69 @@ def _run_pipeline(req: GenerateRequest) -> dict:
     raw_parts = calculate(config, params)
     merged = merge_parts(raw_parts)
 
-    # Раскрой: разворачиваем количество в отдельные прямоугольники
-    items = []
-    for p in merged:
-        for _ in range(p.qty):
-            items.append((p.length, p.width, p.name))
-    pack_result = bin_packing.pack(items)
+    # Зазор раскроя: для фрезеровки минимум = диаметр фрезы + 2 мм (иначе резы соседних
+    # деталей сольются). Для пилы достаточно пропила.
+    gap = max(4.0, req.tool_diameter + 2.0) if req.gcode else 4.0
+
+    # На листовой раскрой и фрезеровку идут только листовые детали; ножки/брус — отдельно
+    routable = [p for p in merged if p.is_routable()]
+    solid = [p for p in merged if not p.is_routable()]
+
+    # Раскрой: разворачиваем количество в отдельные детали с уникальным id "i||Имя"
+    expanded = [p for p in routable for _ in range(p.qty)]
+    items = [(p.length, p.width, f"{i}||{p.name}") for i, p in enumerate(expanded)]
+    pack_result = bin_packing.pack(items, kerf=gap)
     cutmap_svg = bin_packing.render_cutmap_svg(pack_result)
 
     previews = [{"name": p.name, "block": p.block, "svg": part_preview_svg(p, req.joint)}
-                for p in merged]
+                for p in routable]
 
     parts_table = [{
         "name": p.name, "block": p.block, "qty": p.qty,
         "length": round(p.length, 1), "width": round(p.width, 1),
         "thickness": round(p.thickness, 1), "material": p.material,
+        "stock": "лист" if p.is_routable() else "массив/брус",
     } for p in merged]
 
-    zip_bytes, filenames = build_dxf_zip(merged, req.joint, req.sofa_type)
+    # --- CAM: траектории + G-code по листам ---
+    gcode_sheets = []
+    extra_files = {}
+    cam_totals = {"cut_len_m": 0.0, "holes": 0, "est_min": 0.0}
+    if req.gcode and pack_result["sheet_count"] > 0:
+        settings = cam.CamSettings(
+            tool_diameter=req.tool_diameter, spindle_rpm=req.spindle_rpm,
+            feed_xy=req.feed_xy, feed_z=req.feed_z, pass_depth=req.pass_depth,
+            tab_height=req.tab_height, tab_width=req.tab_width,
+        )
+        parts_by_idx = {i: p for i, p in enumerate(expanded)}
+        holes_fn = lambda part: compute_holes(part.length, part.width,
+                                              part.thickness, req.joint)
+        for n, placements in enumerate(pack_result["sheets"]):
+            res = cam.gcode_for_sheet(
+                placements, parts_by_idx, holes_fn, settings, req.material,
+                pack_result["sheet_w"], pack_result["sheet_h"], n)
+            extra_files[f"gcode/sheet_{n+1}.nc"] = res["nc"].encode("utf-8")
+            gcode_sheets.append({
+                "sheet": n + 1,
+                "svg": cam.render_backplot_svg(res),
+                "stats": res["stats"],
+            })
+            cam_totals["cut_len_m"] += res["stats"]["cut_len_m"]
+            cam_totals["holes"] += res["stats"]["holes"]
+            cam_totals["est_min"] += res["stats"]["est_min"]
+        cam_totals = {k: round(v, 1) if isinstance(v, float) else v
+                      for k, v in cam_totals.items()}
+
+    zip_bytes, filenames = build_dxf_zip(merged, req.joint, req.sofa_type, extra_files)
     download_id = uuid.uuid4().hex
     _ZIP_CACHE[download_id] = zip_bytes
 
     logger.info(
-        "Генерация: тип=%s L=%.0f W=%.0f деталей=%d листов=%d использование=%.1f%%",
+        "Генерация: тип=%s L=%.0f W=%.0f деталей=%d листов=%d использование=%.1f%% "
+        "G-code=%s отверстий=%d рез=%.1fм ~%.1fмин",
         req.sofa_type, req.length, req.depth, len(merged),
         pack_result["sheet_count"], pack_result["utilization"],
+        req.gcode, cam_totals["holes"], cam_totals["cut_len_m"], cam_totals["est_min"],
     )
 
     return {
@@ -179,6 +235,12 @@ def _run_pipeline(req: GenerateRequest) -> dict:
         "sheets": pack_result["sheet_count"],
         "utilization": pack_result["utilization"],
         "oversize": pack_result["oversize"],
+        "gcode_enabled": req.gcode,
+        "gcode_sheets": gcode_sheets,
+        "cam_totals": cam_totals,
+        "solid_parts": [{"name": p.name, "qty": p.qty,
+                         "size": f"{p.length:.0f}×{p.width:.0f}×{p.thickness:.0f}"}
+                        for p in solid],
     }
 
 

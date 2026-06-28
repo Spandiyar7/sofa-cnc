@@ -133,8 +133,22 @@ function buildRequest() {
     material: $("f_material").value,
     thickness: parseFloat($("f_thickness").value),
     joint: $("f_joint").value,
+    gcode: $("f_gcode").checked,
+    tool_diameter: parseFloat($("f_tool").value),
+    spindle_rpm: parseInt($("f_rpm").value) || 18000,
+    feed_xy: parseFloat($("f_feed_xy").value),
+    feed_z: parseFloat($("f_feed_z").value),
+    pass_depth: parseFloat($("f_pass").value),
+    tab_height: parseFloat($("f_tab_h").value),
+    tab_width: parseFloat($("f_tab_w").value),
   };
 }
+
+// показывать/скрывать поля ЧПУ по чекбоксу
+$("f_gcode").addEventListener("change", () => {
+  $("camFields").style.opacity = $("f_gcode").checked ? "1" : "0.4";
+  $("camFields").style.pointerEvents = $("f_gcode").checked ? "" : "none";
+});
 
 // ---------- Блок Г: генерация ----------
 $("generateBtn").addEventListener("click", async () => {
@@ -172,16 +186,32 @@ function renderResult(r) {
   $("r_sheets").textContent = r.sheets;
   $("r_util").textContent = r.utilization + "%";
 
+  const cam = r.cam_totals || { holes: 0, cut_len_m: 0, est_min: 0 };
+  $("r_holes").textContent = cam.holes || 0;
+  $("r_cut").textContent = (cam.cut_len_m || 0) + " м";
+  $("r_time").textContent = cam.est_min || 0;
+  document.querySelectorAll(".stat.cam").forEach((e) => {
+    e.style.display = r.gcode_enabled ? "" : "none";
+  });
+
   $("oversizeWarn").textContent = (r.oversize && r.oversize.length)
     ? "⚠ Не поместились на лист: " + r.oversize.join(", ")
+    : "";
+
+  $("solidNote").textContent = (r.solid_parts && r.solid_parts.length)
+    ? "🪵 Из массива/бруса (не идёт на листовой раскрой, делается отдельно): " +
+      r.solid_parts.map((s) => `${s.name} ×${s.qty} (${s.size})`).join(", ")
     : "";
 
   const tbody = $("partsTable").querySelector("tbody");
   tbody.innerHTML = "";
   r.parts.forEach((p) => {
     const tr = document.createElement("tr");
+    const stockBadge = p.stock === "лист"
+      ? '<span class="badge">лист</span>'
+      : '<span class="badge manual">массив/брус</span>';
     tr.innerHTML = `<td>${p.block}</td><td>${p.name}</td><td>${p.qty}</td>` +
-      `<td>${p.length} × ${p.width} × ${p.thickness}</td><td>${p.material}</td>`;
+      `<td>${p.length} × ${p.width} × ${p.thickness}</td><td>${p.material}</td><td>${stockBadge}</td>`;
     tbody.appendChild(tr);
   });
 
@@ -195,6 +225,24 @@ function renderResult(r) {
   });
 
   $("cutmap").innerHTML = r.cutmap_svg;
+
+  // G-code: симуляция траекторий по листам
+  const gs = $("gcodeSection");
+  const bp = $("backplots");
+  if (r.gcode_enabled && r.gcode_sheets && r.gcode_sheets.length) {
+    gs.style.display = "";
+    bp.innerHTML = "";
+    r.gcode_sheets.forEach((s) => {
+      const div = document.createElement("div");
+      div.className = "preview-item";
+      div.innerHTML = s.svg +
+        `<div class="cap">Лист ${s.sheet} · ${s.stats.holes} отв · ` +
+        `${s.stats.cut_len_m} м реза · ~${s.stats.est_min} мин</div>`;
+      bp.appendChild(div);
+    });
+  } else {
+    gs.style.display = "none";
+  }
 }
 
 // ---------- скачать ZIP ----------

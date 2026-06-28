@@ -205,7 +205,7 @@ def render_cutmap_svg(pack_result: dict) -> str:
             f'<rect x="{pad}" y="{y_off:.0f}" width="{sw:.1f}" height="{sh:.1f}" '
             f'fill="#fafafa" stroke="#333" stroke-width="1.5"/>')
         for p in placements:
-            base = p.name.split(" (")[0]
+            base = p.name.split("||")[-1].split(" (")[0]
             color = color_for.setdefault(base, _PALETTE[len(color_for) % len(_PALETTE)])
             rx = pad + p.x * scale
             ry = y_off + p.y * scale

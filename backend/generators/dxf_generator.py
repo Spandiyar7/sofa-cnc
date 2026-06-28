@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import io
 import zipfile
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import ezdxf
 
@@ -159,8 +159,13 @@ def _doc_to_bytes(doc) -> bytes:
     return stream.getvalue().encode("utf-8")
 
 
-def build_dxf_zip(parts: List[Part], joint: str, sofa_type: str) -> Tuple[bytes, List[str]]:
-    """Возвращает (zip_bytes, список_имён_файлов). По одному DXF на уникальную деталь."""
+def build_dxf_zip(parts: List[Part], joint: str, sofa_type: str,
+                  extra_files: Optional[dict] = None) -> Tuple[bytes, List[str]]:
+    """Возвращает (zip_bytes, список_имён_файлов).
+
+    По одному DXF на уникальную деталь (в папке dxf/) + дополнительные файлы
+    extra_files {имя: bytes} (например, G-code .nc по листам в папке gcode/).
+    """
     type_slug = TYPE_SLUG.get(sofa_type, "sofa")
     buf = io.BytesIO()
     names: List[str] = []
@@ -175,6 +180,9 @@ def build_dxf_zip(parts: List[Part], joint: str, sofa_type: str) -> Tuple[bytes,
                 i += 1
             used.add(fname)
             doc = _build_doc(part, joint)
-            zf.writestr(fname, _doc_to_bytes(doc))
+            zf.writestr(f"dxf/{fname}", _doc_to_bytes(doc))
             names.append(fname)
+        for name, data in (extra_files or {}).items():
+            zf.writestr(name, data)
+            names.append(name)
     return buf.getvalue(), names
